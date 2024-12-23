@@ -1,0 +1,131 @@
+<div class="container">
+  <div class="row">
+    <!-- Control Panel -->
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Deployment Pattern</h5>
+          <div class="btn-group d-flex mb-3" role="group">
+            <button *ngFor="let pattern of patterns" 
+                    type="button" 
+                    class="btn btn-outline-primary"
+                    [class.active]="selectedPattern === pattern.id"
+                    (click)="onPatternSelect(pattern.id)">
+              {{ pattern.name }}
+            </button>
+          </div>
+
+          <h5 class="card-title mt-4">Environment</h5>
+          <div class="btn-group d-flex mb-4" role="group">
+            <button *ngFor="let env of environments" 
+                    type="button" 
+                    class="btn btn-outline-secondary"
+                    [class.active]="selectedEnvironment === env.id"
+                    (click)="onEnvironmentSelect(env.id)">
+              {{ env.name }}
+            </button>
+          </div>
+          <div *ngIf="clusters.length > 0" class="mb-4">
+            <h5 class="card-title">Cluster</h5>
+            <select class="form-select" 
+                    [(ngModel)]="selectedCluster"
+                    (ngModelChange)="onClusterSelect($event)">
+              <option *ngFor="let cluster of clusters" [value]="cluster.name">
+                {{ cluster.name }} ({{ cluster.ingressname }})
+              </option>
+            </select>
+          </div>
+          <!-- Application Host URI -->
+          <div class="mb-4">
+            <h5 class="card-title">Application Host URI</h5>
+            <input type="text" 
+                   class="form-control" 
+                   [(ngModel)]="applicationHostUri" 
+                   placeholder="Enter application host URI">
+          </div>
+          <!-- Component Selection -->
+          <div *ngIf="ingressOptions.length > 0" class="mb-3">
+            <h6>Ingress Components</h6>
+            <div class="form-check" *ngFor="let option of ingressOptions">
+              <input class="form-check-input" 
+                     type="checkbox" 
+                     [id]="'ingress-' + option"
+                     [checked]="isComponentSelected(option, 'ingress')"
+                     (change)="onComponentSelect(option, 'ingress')">
+              <label class="form-check-label" [for]="'ingress-' + option">
+                {{ option }}
+              </label>
+            </div>
+          </div>
+
+          <div *ngIf="egressOptions.length > 0" class="mb-3">
+            <h6>Egress Components</h6>
+            <div class="form-check" *ngFor="let option of egressOptions">
+              <input class="form-check-input" 
+                     type="checkbox" 
+                     [id]="'egress-' + option"
+                     [checked]="isComponentSelected(option, 'egress')"
+                     (change)="onComponentSelect(option, 'egress')">
+              <label class="form-check-label" [for]="'egress-' + option">
+                {{ option }}
+              </label>
+            </div>
+          </div>
+
+          <div *ngIf="securityOptions.length > 0" class="mb-3">
+            <h6>Security Components</h6>
+            <div class="form-check" *ngFor="let option of securityOptions">
+              <input class="form-check-input" 
+                     type="checkbox" 
+                     [id]="'security-' + option"
+                     [checked]="isComponentSelected(option, 'security')"
+                     (change)="onComponentSelect(option, 'security')">
+              <label class="form-check-label" [for]="'security-' + option">
+                {{ option }}
+              </label>
+            </div>
+          </div>
+
+          <div *ngIf="otherOptions.length > 0" class="mb-3">
+            <h6>Other Components</h6>
+            <div class="form-check" *ngFor="let option of otherOptions">
+              <input class="form-check-input" 
+                     type="checkbox" 
+                     [id]="'other-' + option"
+                     [checked]="isComponentSelected(option, 'other')"
+                     (change)="onComponentSelect(option, 'other')">
+              <label class="form-check-label" [for]="'other-' + option">
+                {{ option }}
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Selection Section -->
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Selected Configuration</h5>
+          <div class="selected-info mb-3">
+            <p><strong>DeploymentPattern:</strong> {{ getPatternName(selectedPattern) }}</p>
+            <p><strong>Environment:</strong> {{ getEnvironmentName(selectedEnvironment) }}</p>
+            <p><strong>Cluster:</strong> {{ selectedCluster }}</p>
+            <p><strong>Selected Components:</strong> {{ getSelectedComponentsText() }}</p>
+            <p *ngIf="applicationHostUri"><strong>Application Host URI:</strong> {{ applicationHostUri }}</p>
+          </div>
+
+          <div *ngIf="currentConfig">
+            <div *ngFor="let section of currentConfig.sections">
+              <div *ngIf="shouldShowSection(section)" class="section-content">
+                <h6 class="section-title">{{ section.title }}</h6>
+                <div [innerHTML]="section.content"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

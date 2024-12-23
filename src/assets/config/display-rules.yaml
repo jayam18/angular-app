@@ -1,0 +1,200 @@
+rules:
+  active-active:
+    development:
+      ingress:
+        - "Ingress from Mulesoft"
+        - "Ingress from ForgeRock"
+      egress:
+        - "Egress to Database"
+        - "Egress to Cache"
+        - "Egress to Message Queue"
+      security:
+        - "Mutual Authentication"
+        - "SSL/TLS"
+        - "IP Whitelisting"
+      other:
+        - "Load Balancer"
+        - "Health Checks"
+        - "Monitoring"
+      sections:
+        base:
+          - "Overview"
+          - "Architecture"
+        combinations:
+          "Mutual Authentication,SSL/TLS":
+            - "Security Configuration"
+          "Load Balancer,Health Checks":
+            - "High Availability"
+    test:
+      ingress:
+        - "Ingress from Test Clients"
+        - "Ingress from Test APIs"
+      egress:
+        - "Egress to Test Database"
+        - "Egress to Test Services"
+      security:
+        - "Basic Authentication"
+        - "Test Certificates"
+      other:
+        - "Test Monitoring"
+        - "Test Logging"
+      sections:
+        base:
+          - "Overview"
+          - "Test Setup"
+        combinations:
+          "Test Certificates,Basic Authentication":
+            - "Test Security"
+    production:
+      ingress:
+        - "Ingress from Production Load Balancer"
+        - "Ingress from API Gateway"
+      egress:
+        - "Egress to Production Database"
+        - "Egress to Production Services"
+      security:
+        - "Production Certificates"
+        - "WAF Rules"
+        - "DDoS Protection"
+      other:
+        - "Production Monitoring"
+        - "Disaster Recovery"
+      sections:
+        base:
+          - "Overview"
+          - "Production Architecture"
+        combinations:
+          "Production Certificates,WAF Rules":
+            - "Production Security"
+          "Production Monitoring,Disaster Recovery":
+            - "Production SLA"
+  
+  active-passive:
+    development:
+      ingress:
+        - "Primary Ingress"
+        - "Secondary Ingress"
+      egress:
+        - "Primary Database Connection"
+        - "Secondary Database Connection"
+      security:
+        - "Development SSL"
+        - "Basic Auth"
+      other:
+        - "Failover Configuration"
+        - "Development Monitoring"
+      sections:
+        base:
+          - "Overview"
+          - "Development Setup"
+        combinations:
+          "Primary Ingress,Secondary Ingress":
+            - "Failover Configuration"
+    test:
+      ingress:
+        - "Test Primary Ingress"
+        - "Test Secondary Ingress"
+      egress:
+        - "Test Primary Database"
+        - "Test Secondary Database"
+      security:
+        - "Test SSL"
+        - "Test Auth"
+      other:
+        - "Test Failover"
+        - "Test Monitoring"
+      sections:
+        base:
+          - "Overview"
+          - "Test Environment"
+        combinations:
+          "Test Primary Ingress,Test Secondary Ingress":
+            - "Test Failover"
+    production:
+      ingress:
+        - "Production Primary Ingress"
+        - "Production Secondary Ingress"
+      egress:
+        - "Production Primary Database"
+        - "Production Secondary Database"
+      security:
+        - "Production SSL"
+        - "Production Auth"
+        - "Production WAF"
+      other:
+        - "Production Failover"
+        - "Production Monitoring"
+      sections:
+        base:
+          - "Overview"
+          - "Production Setup"
+        combinations:
+          "Production Primary Ingress,Production Secondary Ingress":
+            - "Production Failover"
+          "Production SSL,Production WAF":
+            - "Production Security"
+
+  active-dr:
+    development:
+      ingress:
+        - "Primary Site Ingress"
+        - "DR Site Ingress"
+      egress:
+        - "Primary Database"
+        - "DR Database"
+      security:
+        - "Development Certificates"
+        - "Development Auth"
+      other:
+        - "DR Configuration"
+        - "Development Monitoring"
+      sections:
+        base:
+          - "Overview"
+          - "DR Setup"
+        combinations:
+          "Primary Site Ingress,DR Site Ingress":
+            - "DR Configuration"
+    test:
+      ingress:
+        - "Test Primary Site Ingress"
+        - "Test DR Site Ingress"
+      egress:
+        - "Test Primary Database"
+        - "Test DR Database"
+      security:
+        - "Test Certificates"
+        - "Test Auth"
+      other:
+        - "Test DR Config"
+        - "Test Monitoring"
+      sections:
+        base:
+          - "Overview"
+          - "Test DR Setup"
+        combinations:
+          "Test Primary Site Ingress,Test DR Site Ingress":
+            - "Test DR Configuration"
+    production:
+      ingress:
+        - "Production Primary Site Ingress"
+        - "Production DR Site Ingress"
+      egress:
+        - "Production Primary Database"
+        - "Production DR Database"
+      security:
+        - "Production Certificates"
+        - "Production Auth"
+        - "Production WAF"
+      other:
+        - "Production DR Config"
+        - "Production Monitoring"
+      sections:
+        base:
+          - "Overview"
+          - "Production DR Setup"
+        combinations:
+          "Production Primary Site Ingress,Production DR Site Ingress":
+            - "Production DR Configuration"
+          "Production Certificates,Production WAF":
+            - "Production Security"

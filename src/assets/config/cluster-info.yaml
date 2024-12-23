@@ -1,0 +1,28 @@
+clusters:
+  development:
+    - name: arod05
+      ingressvip: "10.3.3.3"
+      ingressname: "*.apps.arod05.example.com"
+      api: "api.arod05.example.com"
+    - name: arod06
+      ingressvip: "10.3.6.3"
+      ingressname: "*.apps.arod06.example.com"
+      api: "api.arod06.example.com"
+  test:
+    - name: arot05
+      ingressvip: "10.3.3.3"
+      ingressname: "*.apps.arot05.example.com"
+      api: "api.arot05.example.com"
+    - name: arot06
+      ingressvip: "10.3.3.3"
+      ingressname: "*.apps.arot05.example.com"
+      api: "api.arot05.example.com"
+  production:
+    - name: arop05
+      ingressvip: "10.3.3.3"
+      ingressname: "*.apps.arop05.example.com"
+      api: "api.arod05.example.com"
+    - name: arop06
+      ingressvip: "10.3.3.3"
+      ingressname: "*.apps.arop05.example.com"
+      api: "api.arod05.example.com"
