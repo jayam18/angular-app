@@ -1,36 +1,53 @@
 import { Component, OnInit } from '@angular/core';
 import { ConfigService } from '../services/config.service';
 
+interface Pattern {
+  id: string;
+  name: string;
+}
+
+interface Environment {
+  id: string;
+  name: string;
+}
+
+interface ComponentSelections {
+  ingress: string[];
+  egress: string[];
+  security: string[];
+  other: string[];
+}
+
 @Component({
   selector: 'app-flowchart',
   templateUrl: './flowchart.component.html',
   styleUrls: ['./flowchart.component.css']
 })
 export class FlowchartComponent implements OnInit {
-  patterns = [
+  readonly patterns: Pattern[] = [
     { id: 'active-active', name: 'Active-Active' },
     { id: 'active-passive', name: 'Active-Passive' },
     { id: 'active-dr', name: 'Active-DR' }
   ];
 
-  environments = [
+  readonly environments: Environment[] = [
     { id: 'development', name: 'Development' },
     { id: 'test', name: 'Test' },
     { id: 'production', name: 'Production' }
   ];
 
   clusters: any[] = [];
-  selectedCluster: string = '';
-  applicationHostUri: string = '';
+  selectedCluster = '';
+  applicationHostUri = '';
 
   ingressOptions: string[] = [];
   egressOptions: string[] = [];
   securityOptions: string[] = [];
   otherOptions: string[] = [];
 
-  selectedPattern: string = '';
-  selectedEnvironment: string = '';
-  selectedComponents: { [key: string]: string[] } = {
+  selectedPattern = '';
+  selectedEnvironment = '';
+  selectedComponents: ComponentSelections = {
     ingress: [],
     egress: [],
     security: [],
@@ -44,18 +61,31 @@ export class FlowchartComponent implements OnInit {
   ngOnInit(): void {
     this.selectedPattern = this.patterns[0].id;
     this.selectedEnvironment = this.environments[0].id;
+    this.loadInitialState();
+  }
+
+  private loadInitialState(): void {
     this.loadComponentOptions();
     this.loadClusterOptions();
     this.updateConfiguration();
   }
 
   loadComponentOptions(): void {
+    if (!this.selectedPattern || !this.selectedEnvironment) {
+      this.ingressOptions = [];
+      this.egressOptions = [];
+      this.securityOptions = [];
+      this.otherOptions = [];
+      return;
+    }
+
     this.configService.getComponentOptions(this.selectedPattern, this.selectedEnvironment)
       .subscribe(options => {
-        this.ingressOptions = options.ingress || [];
-        this.egressOptions = options.egress || [];
-        this.securityOptions = options.security || [];
-        this.otherOptions = options.other || [];
+        const { ingress = [], egress = [], security = [], other = [] } = options;
+        this.ingressOptions = ingress;
+        this.egressOptions = egress;
+        this.securityOptions = security;
+        this.otherOptions = other;
       });
   }
 
@@ -63,22 +93,32 @@ export class FlowchartComponent implements OnInit {
     this.configService.getClusterOptions(this.selectedEnvironment)
       .subscribe(clusters => {
         this.clusters = clusters;
-        if (clusters.length > 0) {
-          this.selectedCluster = clusters[0].name;
-        } else {
-          this.selectedCluster = '';
-        }
+        this.selectedCluster = clusters.length > 0 ? clusters[0].name : '';
       });
   }
 
   onPatternSelect(patternId: string): void {
     this.selectedPattern = patternId;
+    // Reset component selections when pattern changes
+    this.selectedComponents = {
+      ingress: [],
+      egress: [],
+      security: [],
+      other: []
+    };
     this.loadComponentOptions();
     this.updateConfiguration();
   }
 
   onEnvironmentSelect(envId: string): void {
     this.selectedEnvironment = envId;
+    // Reset component selections when environment changes
+    this.selectedComponents = {
+      ingress: [],
+      egress: [],
+      security: [],
+      other: []
+    };
     this.loadComponentOptions();
     this.loadClusterOptions();
     this.updateConfiguration();
@@ -101,73 +141,62 @@ export class FlowchartComponent implements OnInit {
   }
 
   getPatternName(patternId: string): string {
-    const pattern = this.patterns.find(p => p.id === patternId);
-    return pattern ? pattern.name : '';
+    return this.patterns.find(p => p.id === patternId)?.name || '';
   }
 
   getEnvironmentName(envId: string): string {
-    const env = this.environments.find(e => e.id === envId);
-    return env ? env.name : '';
+    return this.environments.find(e => e.id === envId)?.name || '';
   }
 
   shouldShowSection(section: any): boolean {
-    // 1. No sections shown until pattern and environment are selected
     if (!section || !this.selectedPattern || !this.selectedEnvironment) {
       return false;
     }
 
-    const selectedComponentsList = Object.values(this.selectedComponents).flat();
+    // Get the current configuration
+    const patternConfig = this.configService.getRules()?.[this.selectedPattern];
+    if (!patternConfig) return false;
 
-    // Check if it's a combination section
-    const isCombinationSection = section.title?.toLowerCase().includes('combination');
+    const envConfig = patternConfig[this.selectedEnvironment];
+    if (!envConfig) return false;
 
-    // 2. Base sections (when pattern and environment are selected)
-    if (!isCombinationSection) {
-      // If section has required components (component section), show when component is selected
-      if (section.requiredComponents) {
-        if (Array.isArray(section.requiredComponents)) {
-          return section.requiredComponents.every((component: string) =>
-            selectedComponentsList.includes(component)
-          );
-        }
-        return selectedComponentsList.includes(section.requiredComponents);
-      }
-      // Show base sections without requirements when pattern and environment are selected
+    // Always show base sections when pattern and environment are selected
+    if (envConfig.sections?.base?.includes(section.title)) {
       return true;
     }
 
-    // 3. Combination sections
-    if (isCombinationSection && section.requiredComponents) {
-      // Check if all required components for the combination are selected
-      if (Array.isArray(section.requiredComponents)) {
-        return section.requiredComponents.every((component: string) =>
-          selectedComponentsList.includes(component)
-        );
-      }
-      return selectedComponentsList.includes(section.requiredComponents);
+    const selectedComponentsList = Object.values(this.selectedComponents).flat();
+    
+    // For non-base sections, require component selection
+    if (!section.requiredComponents) {
+      return false;
     }
 
-    return false;
+    // Handle combination sections
+    return Array.isArray(section.requiredComponents) ?
+      section.requiredComponents.every((component: string) => selectedComponentsList.includes(component)) :
+      selectedComponentsList.includes(section.requiredComponents);
   }
 
   isComponentSelected(option: string, category: string): boolean {
-    return this.selectedComponents[category].includes(option);
+    return this.selectedComponents[category as keyof ComponentSelections].includes(option);
   }
 
   onComponentSelect(option: string, category: string): void {
-    const index = this.selectedComponents[category].indexOf(option);
+    const componentList = this.selectedComponents[category as keyof ComponentSelections];
+    const index = componentList.indexOf(option);
+    
     if (index === -1) {
-      this.selectedComponents[category].push(option);
+      componentList.push(option);
     } else {
-      this.selectedComponents[category].splice(index, 1);
+      componentList.splice(index, 1);
     }
+    
     this.updateConfiguration();
   }
 
   getSelectedComponentsText(): string {
-    const allSelected = Object.values(this.selectedComponents)
-      .flat()
-      .filter(component => component);
+    const allSelected = Object.values(this.selectedComponents).flat();
     return allSelected.length > 0 ? allSelected.join(', ') : 'No components selected';
   }
 }

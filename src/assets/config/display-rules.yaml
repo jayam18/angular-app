@@ -36,12 +36,12 @@ rules:
         - "Basic Authentication"
         - "Test Certificates"
       other:
-        - "Test Monitoring"
-        - "Test Logging"
+        - " Monitoring"
+        - "Logging"
       sections:
         base:
           - "Overview"
-          - "Test Setup"
+          - "Setup"
         combinations:
           "Test Certificates,Basic Authentication":
             - "Test Security"
@@ -93,7 +93,7 @@ rules:
     test:
       ingress:
         - "Test Primary Ingress"
-        - "Test Secondary Ingress"
+        - "Mulesoft Integration"
       egress:
         - "Test Primary Database"
         - "Test Secondary Database"

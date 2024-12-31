@@ -24,6 +24,8 @@ This is a ingress from forgeRock docs.
 -  Identiify where the traffic is coming from
 - Idenfy something
 
+## Egress to Database
+This is a egress to database docs.
 
 ## Security Configuration
 When using Mutual Authentication with SSL/TLS:

@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
+import { map, catchError } from 'rxjs/operators';
 import * as jsyaml from 'js-yaml';
 
 type ComponentCategory = 'ingress' | 'egress' | 'security' | 'other';
@@ -16,6 +17,12 @@ interface ClusterConfig {
   clusters: {
     [key: string]: ClusterInfo[];
   };
+}
+
+interface Section {
+  title: string;
+  content: string;
+  requiredComponents?: string | string[];
 }
 
 interface ComponentOptions {
@@ -39,23 +46,32 @@ interface DisplayRules {
   };
 }
 
+interface ConfigResult {
+  title: string;
+  sections: Section[];
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class ConfigService {
-  private displayRules: DisplayRules = {
-    rules: {}
-  };
-  private clusterConfig: ClusterConfig = {
-    clusters: {}
-  };
+  private displayRules: DisplayRules = { rules: {} };
+  private clusterConfig: ClusterConfig = { clusters: {} };
+  private currentPattern = '';
+  private currentEnvironment = '';
 
   constructor(private http: HttpClient) {
-    this.loadDisplayRules();
-    this.loadClusterInfo();
+    this.loadInitialData();
   }
 
-  async loadDisplayRules(): Promise<void> {
+  private async loadInitialData(): Promise<void> {
+    await Promise.all([
+      this.loadDisplayRules(),
+      this.loadClusterInfo()
+    ]);
+  }
+
+  private async loadDisplayRules(): Promise<void> {
     try {
       const response = await this.http.get('/assets/config/display-rules.yaml', { responseType: 'text' }).toPromise();
       if (response) {
@@ -66,7 +82,7 @@ export class ConfigService {
     }
   }
 
-  async loadClusterInfo(): Promise<void> {
+  private async loadClusterInfo(): Promise<void> {
     try {
       const response = await this.http.get('/assets/config/cluster-info.yaml', { responseType: 'text' }).toPromise();
       if (response) {
@@ -78,25 +94,28 @@ export class ConfigService {
   }
 
   getComponentOptions(pattern: string, environment: string): Observable<ComponentOptions> {
-    if (!pattern || !environment) {
-      return new Observable(subscriber => {
-        subscriber.next({});
-        subscriber.complete();
-      });
+    if (!pattern || !environment || !this.displayRules?.rules) {
+      return of({});
     }
-
-    const rules = this.displayRules?.rules?.[pattern]?.[environment];
-    return of(rules || {});
+    
+    const config = this.displayRules.rules[pattern]?.[environment];
+    if (!config) {
+      return of({});
+    }
+    
+    // Extract only the component categories
+    const { sections, ...componentCategories } = config;
+    return of(componentCategories);
   }
 
   getClusterOptions(environment: string): Observable<ClusterInfo[]> {
-    if (!environment) {
-      return of([]);
-    }
+    if (!environment) return of([]);
     return of(this.clusterConfig.clusters[environment] || []);
   }
 
-  getConfiguration(pattern: string, environment: string, selectedComponents: any, selectedCluster?: string): Observable<{ title: string; sections: any[] } | undefined> {
+  getConfiguration(pattern: string, environment: string, selectedComponents: any, selectedCluster?: string): Observable<ConfigResult | undefined> {
+    this.currentPattern = pattern;
+    this.currentEnvironment = environment;
     return new Observable(subscriber => {
       this.getConfig(pattern, environment, selectedComponents, selectedCluster).then(config => {
         subscriber.next(config || undefined);
@@ -105,21 +124,16 @@ export class ConfigService {
     });
   }
 
-  private async getConfig(pattern: string, environment: string, selectedComponents: any, selectedCluster?: string): Promise<{ title: string; sections: any[] } | null> {
+  private async getConfig(pattern: string, environment: string, selectedComponents: any, selectedCluster?: string): Promise<ConfigResult | null> {
     try {
-      // Load the appropriate markdown file based on pattern
       const response = await this.http.get(`/assets/config/${pattern}-${environment}.md`, { responseType: 'text' }).toPromise();
       if (!response) return null;
 
-      // Get cluster info if selectedCluster is provided
       const clusterInfo = selectedCluster ? 
         this.clusterConfig.clusters[environment]?.find(c => c.name === selectedCluster) :
         undefined;
 
-      // Split the content into sections
       const sections = this.parseSections(response, clusterInfo);
-
-      // Filter sections based on selected components
       const filteredSections = sections.filter(section => 
         this.shouldShowSection(section, selectedComponents)
       );
@@ -134,21 +148,19 @@ export class ConfigService {
     }
   }
 
-  private parseSections(content: string, selectedCluster?: ClusterInfo): any[] {
-    const sections: any[] = [];
+  private parseSections(content: string, selectedCluster?: ClusterInfo): Section[] {
+    const sections: Section[] = [];
     const lines = content.split('\n');
-    let currentSection: any = null;
+    let currentSection: Section | null = null;
     let currentContent: string[] = [];
 
     for (const line of lines) {
       if (line.startsWith('## ')) {
-        // Save previous section if exists
         if (currentSection) {
           currentSection.content = this.replaceClusterInfo(currentContent.join('\n').trim(), selectedCluster);
           sections.push(currentSection);
         }
 
-        // Start new section
         currentSection = {
           title: line.substring(3).trim(),
           content: '',
@@ -160,7 +172,6 @@ export class ConfigService {
       }
     }
 
-    // Save last section
     if (currentSection) {
       currentSection.content = this.replaceClusterInfo(currentContent.join('\n').trim(), selectedCluster);
       sections.push(currentSection);
@@ -172,79 +183,96 @@ export class ConfigService {
   private replaceClusterInfo(content: string, selectedCluster: ClusterInfo | undefined): string {
     if (!selectedCluster) return content;
     
-    // Create a map dynamically from all properties in the cluster info
-    const clusterInfoMap: { [key: string]: string } = Object.entries(selectedCluster)
+    const clusterInfoMap = Object.entries(selectedCluster)
       .reduce((acc, [key, value]) => {
-        if (typeof value === 'string') {
-          acc[key] = value;
-        }
+        if (typeof value === 'string') acc[key] = value;
         return acc;
-      }, {} as { [key: string]: string });
+      }, {} as Record<string, string>);
 
-    // Replace all occurrences of <!key!> with corresponding cluster info
-    return content.replace(/<!(\w+)!>/g, (match, key) => {
-      return clusterInfoMap[key] || match;
-    });
+    return content.replace(/<!(\w+)!>/g, (_, key) => clusterInfoMap[key] || `<!${key}!>`);
   }
 
-  private extractRequiredComponents(title: string): string[] | undefined {
-    // Check if title matches any combination section
-    for (const pattern in this.displayRules.rules) {
-      for (const env in this.displayRules.rules[pattern]) {
-        const options = this.displayRules.rules[pattern][env];
-        const sections = options.sections;
-        if (sections?.combinations) {
-          for (const components in sections.combinations) {
-            const sectionTitles = sections.combinations[components];
-            if (sectionTitles.includes(title)) {
-              return components.split(',');
-            }
-          }
-        }
-      }
+  private shouldShowSection(section: Section, selectedComponents: any): boolean {
+    if (!this.currentPattern || !this.currentEnvironment) {
+      return false;
     }
 
-    // Check if title matches any base section
-    for (const pattern in this.displayRules.rules) {
-      for (const env in this.displayRules.rules[pattern]) {
-        const options = this.displayRules.rules[pattern][env];
-        const sections = options.sections;
-        if (sections?.base?.includes(title)) {
-          return undefined; // Base sections have no required components
-        }
-      }
+    const patternConfig = this.displayRules?.rules?.[this.currentPattern];
+    if (!patternConfig) {
+      return false;
     }
 
-    // Check if title matches a single component
-    for (const pattern in this.displayRules.rules) {
-      for (const env in this.displayRules.rules[pattern]) {
-        const options = this.displayRules.rules[pattern][env];
-        const categories: ComponentCategory[] = ['ingress', 'egress', 'security', 'other'];
-        for (const category of categories) {
-          const componentList = options[category];
-          if (componentList?.includes(title)) {
-            return [title]; // Single component sections require that component
-          }
-        }
-      }
+    const envConfig = patternConfig[this.currentEnvironment];
+    if (!envConfig) {
+      return false;
     }
 
-    return undefined;
-  }
-
-  private shouldShowSection(section: any, selectedComponents: any): boolean {
-    if (!section || !section.requiredComponents) {
+    // Always show base sections when pattern and environment are selected
+    if (envConfig.sections?.base?.includes(section.title)) {
       return true;
     }
 
     const selectedComponentsList = Object.values(selectedComponents).flat();
+    
+    // For non-base sections, require component selection
+    if (!section.requiredComponents) {
+      return false;
+    }
+    
+    return Array.isArray(section.requiredComponents) ?
+      section.requiredComponents.every(component => selectedComponentsList.includes(component)) :
+      selectedComponentsList.includes(section.requiredComponents);
+  }
 
-    if (Array.isArray(section.requiredComponents)) {
-      return section.requiredComponents.every((component: string) =>
-        selectedComponentsList.includes(component)
-      );
+  private isBaseSection(title: string | undefined): boolean {
+    if (!title) return false;
+    
+    const patternConfig = this.displayRules.rules[this.currentPattern];
+    if (!patternConfig) return false;
+
+    const envConfig = patternConfig[this.currentEnvironment];
+    if (!envConfig) return false;
+
+    return envConfig.sections?.base?.includes(title) || false;
+  }
+
+  private extractRequiredComponents(title: string): string[] | undefined {
+    // Get the current pattern and environment's configuration
+    const patternConfig = this.displayRules.rules[this.currentPattern];
+    if (!patternConfig) return undefined;
+
+    const envConfig = patternConfig[this.currentEnvironment];
+    if (!envConfig) return undefined;
+
+    const { sections, ...categories } = envConfig;
+
+    // First check if it's a base section
+    if (sections?.base?.includes(title)) {
+      return undefined;
     }
 
-    return selectedComponentsList.includes(section.requiredComponents);
+    // Then check combinations
+    if (sections?.combinations) {
+      for (const [components, titles] of Object.entries(sections.combinations)) {
+        if (titles.includes(title)) {
+          return components.split(',');
+        }
+      }
+    }
+
+    // Finally check individual component sections
+    for (const [category, componentList] of Object.entries(categories)) {
+      if (componentList?.includes(title)) {
+        return [title];
+      }
+    }
+
+    // If the section is not found in any of the rules, treat it as a base section
+    return undefined;
+  }
+
+  // Public method to get rules
+  getRules() {
+    return this.displayRules?.rules;
   }
 }
